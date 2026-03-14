@@ -1,0 +1,7 @@
+pyrotgfork==2.2.20
+tgcrypto==1.2.5
+py-tgcalls==2.2.11
+yt-dlp>=2025.01.01
+aiohttp==3.9.5
+numpy==1.26.4
+hijridate==2.6.0
