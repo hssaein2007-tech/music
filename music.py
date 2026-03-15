@@ -29,6 +29,7 @@ from pyrogram.types import (
     InlineKeyboardButton,
     CallbackQuery,
     ChatMemberUpdated,
+    ReplyParameters,
 )
 from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant, InviteRequestSent
 
@@ -1469,13 +1470,14 @@ async def send_nowplaying(chat_id: int, track: Track):
     st = get_state(chat_id)
     caption = await get_nowplaying_caption(track, track.requester_id)
     markup = get_nowplaying_markup(chat_id, track, track.requester_id)
+    rep_params = ReplyParameters(message_id=track.request_msg_id) if track.request_msg_id else None
     try:
         sent = await bot.send_photo(
             chat_id,
             photo=track.thumbnail or BOT_IMAGE,
             caption=caption,
             reply_markup=markup,
-            reply_to_message_id=track.request_msg_id or None,
+            reply_parameters=rep_params,
         )
     except Exception:
         sent = await bot.send_message(
@@ -1483,7 +1485,7 @@ async def send_nowplaying(chat_id: int, track: Track):
             caption,
             reply_markup=markup,
             disable_web_page_preview=True,
-            reply_to_message_id=track.request_msg_id or None,
+            reply_parameters=rep_params,
         )
     st.now_msg = (chat_id, sent.id)
 
@@ -1816,10 +1818,11 @@ async def send_help(chat_id: int, reply_to_message_id: Optional[int] = None, use
     user_id = user.id if user else 0
     caption = _t(user_id, "help_main").format(name=mention_user(user))
     markup = build_help_markup("main", chat_id, user_id)
+    rep_params = ReplyParameters(message_id=reply_to_message_id) if reply_to_message_id else None
     try:
-        await bot.send_photo(chat_id, photo=BOT_IMAGE, caption=caption, reply_markup=markup, reply_to_message_id=reply_to_message_id)
+        await bot.send_photo(chat_id, photo=BOT_IMAGE, caption=caption, reply_markup=markup, reply_parameters=rep_params)
     except Exception:
-        await bot.send_message(chat_id, caption, reply_markup=markup, disable_web_page_preview=True, reply_to_message_id=reply_to_message_id)
+        await bot.send_message(chat_id, caption, reply_markup=markup, disable_web_page_preview=True, reply_parameters=rep_params)
 
 
 @bot.on_callback_query()
@@ -2165,7 +2168,7 @@ async def on_text(client: Client, m: Message):
         dl_markup = InlineKeyboardMarkup([[InlineKeyboardButton("Channel" if get_lang(uid) == "en" else "ᴄʜᴀɴɴᴇʟ", url=CHANNEL_LINK)]])
         try:
             cap_by = f"••• Downloaded By : {name}" if get_lang(uid) == "en" else f"••• تم التحميل من قبل : {name}"
-            await bot.send_audio(chat_id, audio=path, caption=cap_by, title=info.get("title", "Audio"), performer=info.get("uploader", "Unknown"), thumb=thumb_path if thumb_path and os.path.exists(thumb_path) else None, reply_to_message_id=m.id, reply_markup=dl_markup)
+            await bot.send_audio(chat_id, audio=path, caption=cap_by, title=info.get("title", "Audio"), performer=info.get("uploader", "Unknown"), thumb=thumb_path if thumb_path and os.path.exists(thumb_path) else None, reply_parameters=ReplyParameters(message_id=m.id), reply_markup=dl_markup)
         finally:
             try:
                 os.remove(path)
@@ -2192,7 +2195,7 @@ async def on_text(client: Client, m: Message):
         dl_markup = InlineKeyboardMarkup([[InlineKeyboardButton("Channel" if get_lang(uid) == "en" else "ᴄʜᴀɴɴᴇʟ", url=CHANNEL_LINK)]])
         try:
             cap_by = f"••• Downloaded By : {name}" if get_lang(uid) == "en" else f"••• تم التحميل من قبل : {name}"
-            await bot.send_video(chat_id, video=path, caption=f"{_t(uid, 'download_vid_done')} {safe_html(info.get('title', ''))}\n{cap_by}", thumb=thumb_path if thumb_path and os.path.exists(thumb_path) else None, reply_to_message_id=m.id, reply_markup=dl_markup)
+            await bot.send_video(chat_id, video=path, caption=f"{_t(uid, 'download_vid_done')} {safe_html(info.get('title', ''))}\n{cap_by}", thumb=thumb_path if thumb_path and os.path.exists(thumb_path) else None, reply_parameters=ReplyParameters(message_id=m.id), reply_markup=dl_markup)
         finally:
             try:
                 os.remove(path)
