@@ -172,6 +172,7 @@ LANG = {
             "» <b>اغاني</b> - جلب قائمة الاغاني والفنانين\n"
             "» <b>تفعيل الاذان</b> - تفعيل تنبيهات الصلاة في المحادثه\n"
             "» <b>تعطيل الاذان</b> - تعطيل تنبيهات الصلاة في المحادثه\n"
+            "» <b>معلومات الاذان</b> - لعرض تقرير عن حالة وأوقات الأذان\n"
             "» <b>تيست الاذان</b> + فجر/ظهر/مغرب - اختبار صورة وكليشة الاذان فوراً\n"
             "» <b>بنج</b> - عرض سرعة الاستجابة\n"
             "» <b>سورس</b> - لعرض معلومات السورس"
@@ -267,6 +268,7 @@ LANG = {
             "» <b>quran</b> - Get Quran list\n"
             "» <b>songs</b> - Get songs list\n"
             "» <b>athan on</b> / <b>athan off</b> - Control prayer alerts\n"
+            "» <b>athan info</b> - Show prayer alert status and times\n"
             "» <b>test athan</b> + fajr/dhuhr/maghrib - Send a prayer test now\n"
             "» <b>ping</b> - Check bot latency\n"
             "» <b>source</b> - Show source info"
@@ -517,6 +519,8 @@ COMMAND_ALIASES: List[Tuple[str, str]] = [
     ("quran", "quran"),
     ("اغاني", "songs"),
     ("songs", "songs"),
+    ("معلومات الاذان", "athan_info"),
+    ("athan info", "athan_info"),
     ("تيست الاذان", "athan_test"),
     ("اختبار الاذان", "athan_test"),
     ("اذان تيست", "athan_test"),
@@ -752,8 +756,8 @@ def _fetch_today_prayer_times_sync() -> Dict[str, str]:
             res = {}
             if isinstance(obj, dict):
                 for k, v in obj.items():
-                    if isinstance(v, str) and re.match(r'^\d{1,2}:\d{2}', str(v)):
-                        res[str(k).lower()] = str(v)
+                    if isinstance(v, str) and re.match(r'^\d{1,2}:\d{2}', str(v).strip()):
+                        res[str(k).lower()] = str(v).strip()
                     elif isinstance(v, (dict, list)):
                         res.update(_extract_times(v))
             elif isinstance(obj, list):
@@ -763,16 +767,31 @@ def _fetch_today_prayer_times_sync() -> Dict[str, str]:
 
         flat_times = _extract_times(payload)
         result: Dict[str, str] = {}
-        for prayer_key, info in ATHAN_PRAYERS.items():
-            aliases = [prayer_key.lower()]
-            if prayer_key == "Dhuhr":
-                aliases.extend(["zhuhr", "zohar", "zuhr"])
-            val = ""
-            for alias in aliases:
-                if alias in flat_times:
-                    val = flat_times[alias]
-                    break
-            result[prayer_key] = normalize_prayer_clock(val) if val else ""
+        
+        # 1. استخراج الفجر (موقع الكفيل يكتبه fajir)
+        fajr_val = flat_times.get("fajr") or flat_times.get("fajir")
+        if fajr_val:
+            hh, mm = fajr_val.split(":", 1)
+            result["Fajr"] = f"{int(hh):02d}:{mm}"
+            
+        # 2. استخراج الظهر (موقع الكفيل يكتبه doher)
+        dhuhr_val = flat_times.get("dhuhr") or flat_times.get("zhuhr") or flat_times.get("doher")
+        if dhuhr_val:
+            hh, mm = dhuhr_val.split(":", 1)
+            h_int = int(hh)
+            if h_int < 11:  # في حال كان الظهر 1:00 نحوله الى 13:00
+                h_int += 12
+            result["Dhuhr"] = f"{h_int:02d}:{mm}"
+            
+        # 3. استخراج المغرب (تحويل صيغة 12 ساعة الى 24 ساعة)
+        maghrib_val = flat_times.get("maghrib")
+        if maghrib_val:
+            hh, mm = maghrib_val.split(":", 1)
+            h_int = int(hh)
+            if h_int < 12: # تحويل وقت المغرب إلى صيغة 24 ساعة حصراً
+                h_int += 12
+            result["Maghrib"] = f"{h_int:02d}:{mm}"
+            
         return result
     except Exception as e:
         print(f"Prayer API fetch failed: {e}")
@@ -1968,6 +1987,21 @@ async def on_text(client: Client, m: Message):
     if cmd == "songs":
         cap = "🎵 <b>Songs:</b>\n» play eminem\n" if get_lang(uid) == "en" else "🎵 <b>قائمة الأغاني والفنانين:</b>\n\n» شغل اغاني عراقية\n» شغل اغاني حزينة\n» شغل محمد عبدالجبار\n» شغل محمود التركي\n\n*اكتب (شغل + اسم الاغنية او الفنان)*"
         return await m.reply_text(cap, quote=True)
+
+    if cmd == "athan_info":
+        now = local_now()
+        timings = await get_today_prayer_times()
+        is_on = athan_is_enabled(chat_id)
+        
+        msg = f"🕌 **تقرير نظام الأذان** 🕌\n\n"
+        msg += f"⏱ **وقت البوت الحالي (بتوقيت كربلاء):** `{now.strftime('%H:%M:%S')}`\n"
+        msg += f"✅ **حالة الأذان بهذا الجروب:** `{'مفعل 🟢' if is_on else 'معطل 🔴'}`\n\n"
+        msg += f"📅 **أوقات الصلاة اللي سحبها البوت اليوم:**\n"
+        msg += f"🌅 الفجر: `{timings.get('Fajr', 'غير متوفر ❌')}`\n"
+        msg += f"☀️ الظهر: `{timings.get('Dhuhr', 'غير متوفر ❌')}`\n"
+        msg += f"🌙 المغرب: `{timings.get('Maghrib', 'غير متوفر ❌')}`\n"
+        
+        return await m.reply_text(msg, quote=True)
 
     if cmd == "play":
         if m.reply_to_message and (m.reply_to_message.audio or m.reply_to_message.voice or m.reply_to_message.video or m.reply_to_message.document):
