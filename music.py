@@ -30,6 +30,7 @@ from pyrogram.types import (
     CallbackQuery,
     ChatMemberUpdated,
     ReplyParameters,
+    LinkPreviewOptions,
 )
 from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant, InviteRequestSent
 
@@ -899,7 +900,7 @@ async def send_athan_alert(chat_id: int, prayer_key: str, triggered_by: Optional
         sent = await bot.send_photo(chat_id, photo=photo, caption=caption)
     except Exception:
         try:
-            sent = await bot.send_message(chat_id, caption, disable_web_page_preview=True)
+            sent = await bot.send_message(chat_id, caption, link_preview_options=LinkPreviewOptions(is_disabled=True))
         except Exception as e:
             print(f"Failed to send athan alert to {chat_id}: {e}")
             return None
@@ -1030,7 +1031,7 @@ async def restore_assistant_after_kick(chat_id: int, actor=None) -> bool:
                 f"{_t(actor_id, 'assistant_kicked_by').format(name=mention_user(actor))}"
             )
             try:
-                await bot.send_message(chat_id, text, disable_web_page_preview=True)
+                await bot.send_message(chat_id, text, link_preview_options=LinkPreviewOptions(is_disabled=True))
             except Exception as e:
                 print(f"Failed to send assistant restore message: {e}")
             return True
@@ -1484,7 +1485,7 @@ async def send_nowplaying(chat_id: int, track: Track):
             chat_id,
             caption,
             reply_markup=markup,
-            disable_web_page_preview=True,
+            link_preview_options=LinkPreviewOptions(is_disabled=True),
             reply_parameters=rep_params,
         )
     st.now_msg = (chat_id, sent.id)
@@ -1822,7 +1823,7 @@ async def send_help(chat_id: int, reply_to_message_id: Optional[int] = None, use
     try:
         await bot.send_photo(chat_id, photo=BOT_IMAGE, caption=caption, reply_markup=markup, reply_parameters=rep_params)
     except Exception:
-        await bot.send_message(chat_id, caption, reply_markup=markup, disable_web_page_preview=True, reply_parameters=rep_params)
+        await bot.send_message(chat_id, caption, reply_markup=markup, link_preview_options=LinkPreviewOptions(is_disabled=True), reply_parameters=rep_params)
 
 
 @bot.on_callback_query()
@@ -1901,7 +1902,7 @@ async def on_callback(client: Client, cq: CallbackQuery):
                     st.paused = True
                     st.paused_at = now_ts()
                     await cq.answer("Paused ✅" if get_lang(user_id) == "en" else "⏸️ اوكفت ✅")
-                    await bot.send_message(chat_id, _t(user_id, "paused_by").format(name=name), disable_web_page_preview=True)
+                    await bot.send_message(chat_id, _t(user_id, "paused_by").format(name=name), link_preview_options=LinkPreviewOptions(is_disabled=True))
                 else:
                     await cq.answer("Nothing to pause" if get_lang(user_id) == "en" else "ماكو شي شغّال ✅")
             elif action == "resume":
@@ -1909,7 +1910,7 @@ async def on_callback(client: Client, cq: CallbackQuery):
                     if st.playing and st.paused:
                         await resume_current_track(chat_id)
                         await cq.answer("Resumed ✅" if get_lang(user_id) == "en" else "▶️ كملت ✅")
-                        await bot.send_message(chat_id, _t(user_id, "resumed_by").format(name=name), disable_web_page_preview=True)
+                        await bot.send_message(chat_id, _t(user_id, "resumed_by").format(name=name), link_preview_options=LinkPreviewOptions(is_disabled=True))
                     elif not st.playing:
                         await start_track(chat_id, user_id)
                         await cq.answer("Started ✅" if get_lang(user_id) == "en" else "▶️ اشتغلت ✅")
@@ -1921,7 +1922,7 @@ async def on_callback(client: Client, cq: CallbackQuery):
                 else:
                     await force_leave_call(chat_id)
                     await cq.answer("Stopped ✅" if get_lang(user_id) == "en" else "🛑 طلعت ✅")
-                    await bot.send_message(chat_id, _t(user_id, "stopped_by").format(name=name), disable_web_page_preview=True)
+                    await bot.send_message(chat_id, _t(user_id, "stopped_by").format(name=name), link_preview_options=LinkPreviewOptions(is_disabled=True))
             elif action == "delnp":
                 allowed = False
                 if await is_admin(client, chat_id, user_id):
@@ -1957,7 +1958,7 @@ async def on_text(client: Client, m: Message):
 
     if text == "بوت":
         try:
-            await m.reply_text(f"<a href='{get_bot_add_url()}'>{safe_html(random.choice(BOT_REPLIES))}</a>", disable_web_page_preview=True, quote=True)
+            await m.reply_text(f"<a href='{get_bot_add_url()}'>{safe_html(random.choice(BOT_REPLIES))}</a>", link_preview_options=LinkPreviewOptions(is_disabled=True), quote=True)
         except Exception:
             pass
         return
@@ -2054,7 +2055,7 @@ async def on_text(client: Client, m: Message):
                 pass
             return
         if not arg:
-            return await m.reply_text(full_link_text(_t(uid, "need_play_name")), disable_web_page_preview=True, quote=True)
+            return await m.reply_text(full_link_text(_t(uid, "need_play_name")), link_preview_options=LinkPreviewOptions(is_disabled=True), quote=True)
         join_task = asyncio.create_task(warmup_assistant_join(chat_id, uid))
         wait_text = "Starting, please wait a moment…⚡" if get_lang(uid) == "en" else "جاري التشغيل انتظر لحظة…⚡"
         wait_msg = await m.reply_text(wait_text, quote=True)
@@ -2110,7 +2111,7 @@ async def on_text(client: Client, m: Message):
                 pass
             return
         if not arg:
-            return await m.reply_text(full_link_text(_t(uid, "need_video_name")), disable_web_page_preview=True, quote=True)
+            return await m.reply_text(full_link_text(_t(uid, "need_video_name")), link_preview_options=LinkPreviewOptions(is_disabled=True), quote=True)
         join_task = asyncio.create_task(warmup_assistant_join(chat_id, uid))
         wait_text = "Starting, please wait a moment…⚡" if get_lang(uid) == "en" else "جاري التشغيل انتظر لحظة…⚡"
         wait_msg = await m.reply_text(wait_text, quote=True)
@@ -2154,12 +2155,12 @@ async def on_text(client: Client, m: Message):
         
         tip = "\n<i>To play, copy the name and type play before it.</i>" if get_lang(uid) == "en" else "\n<i>للإختيار انسخ الاسم واكتب شغل قبله.</i>"
         text_res += tip
-        await wait.edit_text(text_res, disable_web_page_preview=True)
+        await wait.edit_text(text_res, link_preview_options=LinkPreviewOptions(is_disabled=True))
         return
 
     if cmd == "down":
         if not arg:
-            return await m.reply_text(full_link_text(_t(uid, "need_download_name")), disable_web_page_preview=True, quote=True)
+            return await m.reply_text(full_link_text(_t(uid, "need_download_name")), link_preview_options=LinkPreviewOptions(is_disabled=True), quote=True)
         status_txt = "Downloading, please wait a moment…🎵" if get_lang(uid) == "en" else "جاري التحميل انتظر لحظة…🎵"
         status_msg = await m.reply_text(status_txt, quote=True)
         path, info, thumb_path = await ytdlp_download(arg, "audio")
@@ -2187,7 +2188,7 @@ async def on_text(client: Client, m: Message):
 
     if cmd == "vdown":
         if not arg:
-            return await m.reply_text(full_link_text(_t(uid, "need_video_name")), disable_web_page_preview=True, quote=True)
+            return await m.reply_text(full_link_text(_t(uid, "need_video_name")), link_preview_options=LinkPreviewOptions(is_disabled=True), quote=True)
         status_msg = await m.reply_text(_t(uid, "searching_vid"), quote=True)
         path, info, thumb_path = await ytdlp_download(arg, "video")
         if not path or not os.path.exists(path):
@@ -2214,7 +2215,7 @@ async def on_text(client: Client, m: Message):
 
     if cmd == "switch_video":
         if not st.playing or st.current_index >= len(st.queue):
-            return await m.reply_text(full_link_text(_t(uid, "nothing_playing_linked")), disable_web_page_preview=True, quote=True)
+            return await m.reply_text(full_link_text(_t(uid, "nothing_playing_linked")), link_preview_options=LinkPreviewOptions(is_disabled=True), quote=True)
         try:
             await switch_current_media_mode(chat_id, True)
             await m.reply_text(_t(uid, "switch_to_video_done"), quote=True)
@@ -2224,7 +2225,7 @@ async def on_text(client: Client, m: Message):
 
     if cmd == "switch_audio":
         if not st.playing or st.current_index >= len(st.queue):
-            return await m.reply_text(full_link_text(_t(uid, "nothing_playing_linked")), disable_web_page_preview=True, quote=True)
+            return await m.reply_text(full_link_text(_t(uid, "nothing_playing_linked")), link_preview_options=LinkPreviewOptions(is_disabled=True), quote=True)
         try:
             await switch_current_media_mode(chat_id, False)
             await m.reply_text(_t(uid, "switch_to_audio_done"), quote=True)
@@ -2266,16 +2267,16 @@ async def on_text(client: Client, m: Message):
         try:
             st.loop = False
             await next_track(chat_id)
-            await m.reply_text(_t(uid, "skipped").format(name=name), disable_web_page_preview=True, quote=True)
+            await m.reply_text(_t(uid, "skipped").format(name=name), link_preview_options=LinkPreviewOptions(is_disabled=True), quote=True)
         except Exception:
             pass
         return
 
     if cmd == "stop":
         if not st.playing and not st.queue:
-            return await m.reply_text(full_link_text(_t(uid, "nothing_playing_linked")), disable_web_page_preview=True, quote=True)
+            return await m.reply_text(full_link_text(_t(uid, "nothing_playing_linked")), link_preview_options=LinkPreviewOptions(is_disabled=True), quote=True)
         await force_leave_call(chat_id)
-        await m.reply_text(_t(uid, "stopped_by").format(name=name), disable_web_page_preview=True, quote=True)
+        await m.reply_text(_t(uid, "stopped_by").format(name=name), link_preview_options=LinkPreviewOptions(is_disabled=True), quote=True)
         return
 
     if cmd == "pause":
@@ -2284,7 +2285,7 @@ async def on_text(client: Client, m: Message):
                 await pause_stream(chat_id)
                 st.paused = True
                 st.paused_at = now_ts()
-                await m.reply_text(_t(uid, "paused_by").format(name=name), disable_web_page_preview=True, quote=True)
+                await m.reply_text(_t(uid, "paused_by").format(name=name), link_preview_options=LinkPreviewOptions(is_disabled=True), quote=True)
             except Exception:
                 pass
         else:
@@ -2295,10 +2296,10 @@ async def on_text(client: Client, m: Message):
         try:
             if st.playing and st.paused:
                 await resume_current_track(chat_id)
-                await m.reply_text(_t(uid, "resumed_by").format(name=name), disable_web_page_preview=True, quote=True)
+                await m.reply_text(_t(uid, "resumed_by").format(name=name), link_preview_options=LinkPreviewOptions(is_disabled=True), quote=True)
             elif not st.playing and st.queue:
                 await start_track(chat_id, uid)
-                await m.reply_text(_t(uid, "resumed_by").format(name=name), disable_web_page_preview=True, quote=True)
+                await m.reply_text(_t(uid, "resumed_by").format(name=name), link_preview_options=LinkPreviewOptions(is_disabled=True), quote=True)
             else:
                 await m.reply_text(_t(uid, "nothing_playing"), quote=True)
         except Exception:
