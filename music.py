@@ -1647,7 +1647,8 @@ async def start_track(chat_id: int, user_id: int):
     joined = await ensure_assistant_joined(chat_id, user_id)
     if not joined:
         try:
-            await bot.send_message(chat_id, "❌ لم أتمكن من إضافة حساب المساعد، يرجى إضافته يدوياً وتأكد أن البوت مشرف ولديه صلاحية إضافة مستخدمين.")
+            err_msg = "❌ Could not add the assistant account. Please add it manually and ensure the bot is an admin with 'add users' rights." if get_lang(user_id) == "en" else "❌ لم أتمكن من إضافة حساب المساعد، يرجى إضافته يدوياً وتأكد أن البوت مشرف ولديه صلاحية إضافة مستخدمين."
+            await bot.send_message(chat_id, err_msg)
         except Exception:
             pass
         bad_index = min(st.current_index, len(st.queue) - 1)
@@ -1836,7 +1837,7 @@ async def on_callback(client: Client, cq: CallbackQuery):
         else:
             req_user_id = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else 0
         if req_user_id and user_id != req_user_id:
-            return await cq.answer("❌ هذا الأمر لا يخصك.", show_alert=True)
+            return await cq.answer("❌ هذا الأمر لا يخصك." if get_lang(user_id) != "en" else "❌ This command is not for you.", show_alert=True)
         if action == "main":
             await cq.message.edit_caption(_t(user_id, "start_text"), reply_markup=await build_start_markup(client, user_id))
         elif action == "commands":
@@ -1863,7 +1864,7 @@ async def on_callback(client: Client, cq: CallbackQuery):
         req_user_id = int(parts[3]) if len(parts) > 3 else 0
         st = get_state(chat_id)
         if req_user_id and user_id != req_user_id:
-            return await cq.answer("❌ هذه القائمة تخص الشخص الذي طلبها فقط.", show_alert=True)
+            return await cq.answer("❌ هذه القائمة تخص الشخص الذي طلبها فقط." if get_lang(user_id) != "en" else "❌ This menu is only for the requester.", show_alert=True)
         if action == "main":
             await cq.message.edit_caption(_t(user_id, "help_main").format(name=mention_user(cq.from_user)), reply_markup=build_help_markup("main", chat_id, user_id))
         elif action == "members":
@@ -1993,38 +1994,51 @@ async def on_text(client: Client, m: Message):
         timings = await get_today_prayer_times()
         is_on = athan_is_enabled(chat_id)
         
-        msg = f"🕌 **تقرير نظام الأذان** 🕌\n\n"
-        msg += f"⏱ **وقت البوت الحالي (بتوقيت كربلاء):** `{now.strftime('%H:%M:%S')}`\n"
-        msg += f"✅ **حالة الأذان بهذا الجروب:** `{'مفعل 🟢' if is_on else 'معطل 🔴'}`\n\n"
-        msg += f"📅 **أوقات الصلاة اللي سحبها البوت اليوم:**\n"
-        msg += f"🌅 الفجر: `{timings.get('Fajr', 'غير متوفر ❌')}`\n"
-        msg += f"☀️ الظهر: `{timings.get('Dhuhr', 'غير متوفر ❌')}`\n"
-        msg += f"🌙 المغرب: `{timings.get('Maghrib', 'غير متوفر ❌')}`\n"
-        
+        if get_lang(uid) == "en":
+            msg = f"🕌 **Athan System Report** 🕌\n\n"
+            msg += f"⏱ **Current Time (Karbala):** `{now.strftime('%H:%M:%S')}`\n"
+            msg += f"✅ **Athan Status here:** `{'Enabled 🟢' if is_on else 'Disabled 🔴'}`\n\n"
+            msg += f"📅 **Fetched Prayer Times:**\n"
+            msg += f"🌅 Fajr: `{timings.get('Fajr', 'N/A ❌')}`\n"
+            msg += f"☀️ Dhuhr: `{timings.get('Dhuhr', 'N/A ❌')}`\n"
+            msg += f"🌙 Maghrib: `{timings.get('Maghrib', 'N/A ❌')}`\n"
+        else:
+            msg = f"🕌 **تقرير نظام الأذان** 🕌\n\n"
+            msg += f"⏱ **وقت البوت الحالي (بتوقيت كربلاء):** `{now.strftime('%H:%M:%S')}`\n"
+            msg += f"✅ **حالة الأذان بهذا الجروب:** `{'مفعل 🟢' if is_on else 'معطل 🔴'}`\n\n"
+            msg += f"📅 **أوقات الصلاة اللي سحبها البوت اليوم:**\n"
+            msg += f"🌅 الفجر: `{timings.get('Fajr', 'غير متوفر ❌')}`\n"
+            msg += f"☀️ الظهر: `{timings.get('Dhuhr', 'غير متوفر ❌')}`\n"
+            msg += f"🌙 المغرب: `{timings.get('Maghrib', 'غير متوفر ❌')}`\n"
+            
         return await m.reply_text(msg, quote=True)
 
     if cmd == "play":
         if m.reply_to_message and (m.reply_to_message.audio or m.reply_to_message.voice or m.reply_to_message.video or m.reply_to_message.document):
             join_task = asyncio.create_task(warmup_assistant_join(chat_id, uid))
-            wait_msg = await m.reply_text("جاري التشغيل انتظر لحظة…⚡", quote=True)
+            wait_text = "Starting, please wait a moment…⚡" if get_lang(uid) == "en" else "جاري التشغيل انتظر لحظة…⚡"
+            wait_msg = await m.reply_text(wait_text, quote=True)
             file_path = await m.reply_to_message.download()
             if m.reply_to_message.audio:
                 duration = m.reply_to_message.audio.duration
-                title = m.reply_to_message.audio.title or m.reply_to_message.audio.file_name or "ملف صوتي"
+                title_def = "Audio File" if get_lang(uid) == "en" else "ملف صوتي"
+                title = m.reply_to_message.audio.title or m.reply_to_message.audio.file_name or title_def
             elif m.reply_to_message.voice:
                 duration = m.reply_to_message.voice.duration
-                title = "بصمة صوتية"
+                title = "Voice Note" if get_lang(uid) == "en" else "بصمة صوتية"
             elif m.reply_to_message.video:
                 duration = m.reply_to_message.video.duration
-                title = m.reply_to_message.video.file_name or "مقطع فيديو"
+                title_def = "Video Clip" if get_lang(uid) == "en" else "مقطع فيديو"
+                title = m.reply_to_message.video.file_name or title_def
             else:
                 duration = 0
-                title = "ملف"
+                title = "File" if get_lang(uid) == "en" else "ملف"
             tr = Track(title=title, source="telegram", stream_url=file_path, duration=duration or 0, requester_id=uid, request_msg_id=m.id, thumbnail=BOT_IMAGE, kind="audio")
             st.queue.append(tr)
             if not st.playing:
                 try:
-                    await wait_msg.edit_text("راح يشتغل هسه…🚦")
+                    run_text = "Starting now…🚦" if get_lang(uid) == "en" else "راح يشتغل هسه…🚦"
+                    await wait_msg.edit_text(run_text)
                     await asyncio.sleep(0.8)
                 except Exception:
                     pass
@@ -2039,7 +2053,8 @@ async def on_text(client: Client, m: Message):
         if not arg:
             return await m.reply_text(full_link_text(_t(uid, "need_play_name")), disable_web_page_preview=True, quote=True)
         join_task = asyncio.create_task(warmup_assistant_join(chat_id, uid))
-        wait_msg = await m.reply_text("جاري التشغيل انتظر لحظة…⚡", quote=True)
+        wait_text = "Starting, please wait a moment…⚡" if get_lang(uid) == "en" else "جاري التشغيل انتظر لحظة…⚡"
+        wait_msg = await m.reply_text(wait_text, quote=True)
         tr = await build_track_from_query(arg, want_video=False, requester_id=uid, request_msg_id=m.id)
         if not tr:
             await wait_msg.delete()
@@ -2047,7 +2062,8 @@ async def on_text(client: Client, m: Message):
         st.queue.append(tr)
         if not st.playing:
             try:
-                await wait_msg.edit_text("راح يشتغل هسه…🚦")
+                run_text = "Starting now…🚦" if get_lang(uid) == "en" else "راح يشتغل هسه…🚦"
+                await wait_msg.edit_text(run_text)
                 await asyncio.sleep(0.8)
             except Exception:
                 pass
@@ -2063,19 +2079,22 @@ async def on_text(client: Client, m: Message):
     if cmd == "vplay":
         if m.reply_to_message and (m.reply_to_message.video or m.reply_to_message.document):
             join_task = asyncio.create_task(warmup_assistant_join(chat_id, uid))
-            wait_msg = await m.reply_text("جاري التشغيل انتظر لحظة…⚡", quote=True)
+            wait_text = "Starting, please wait a moment…⚡" if get_lang(uid) == "en" else "جاري التشغيل انتظر لحظة…⚡"
+            wait_msg = await m.reply_text(wait_text, quote=True)
             file_path = await m.reply_to_message.download()
             if m.reply_to_message.video:
                 duration = m.reply_to_message.video.duration
-                title = m.reply_to_message.video.file_name or "مقطع فيديو"
+                title_def = "Video Clip" if get_lang(uid) == "en" else "مقطع فيديو"
+                title = m.reply_to_message.video.file_name or title_def
             else:
                 duration = 0
-                title = "ملف فيديو"
+                title = "Video File" if get_lang(uid) == "en" else "ملف فيديو"
             tr = Track(title=title, source="telegram", stream_url=file_path, duration=duration or 0, requester_id=uid, request_msg_id=m.id, thumbnail=BOT_IMAGE, kind="video")
             st.queue.append(tr)
             if not st.playing:
                 try:
-                    await wait_msg.edit_text("راح يشتغل هسه…🚦")
+                    run_text = "Starting now…🚦" if get_lang(uid) == "en" else "راح يشتغل هسه…🚦"
+                    await wait_msg.edit_text(run_text)
                     await asyncio.sleep(0.8)
                 except Exception:
                     pass
@@ -2090,7 +2109,8 @@ async def on_text(client: Client, m: Message):
         if not arg:
             return await m.reply_text(full_link_text(_t(uid, "need_video_name")), disable_web_page_preview=True, quote=True)
         join_task = asyncio.create_task(warmup_assistant_join(chat_id, uid))
-        wait_msg = await m.reply_text("جاري التشغيل انتظر لحظة…⚡", quote=True)
+        wait_text = "Starting, please wait a moment…⚡" if get_lang(uid) == "en" else "جاري التشغيل انتظر لحظة…⚡"
+        wait_msg = await m.reply_text(wait_text, quote=True)
         tr = await build_track_from_query(arg, want_video=True, requester_id=uid, request_msg_id=m.id)
         if not tr:
             await wait_msg.delete()
@@ -2098,7 +2118,8 @@ async def on_text(client: Client, m: Message):
         st.queue.append(tr)
         if not st.playing:
             try:
-                await wait_msg.edit_text("راح يشتغل هسه…🚦")
+                run_text = "Starting now…🚦" if get_lang(uid) == "en" else "راح يشتغل هسه…🚦"
+                await wait_msg.edit_text(run_text)
                 await asyncio.sleep(0.8)
             except Exception:
                 pass
@@ -2113,29 +2134,38 @@ async def on_text(client: Client, m: Message):
 
     if cmd == "search":
         if not arg:
-            return await m.reply_text("اكتب: <b>بحث</b> + الكلمة اللي تريدها", quote=True)
-        wait = await m.reply_text("🔍 جاري البحث...", quote=True)
+            err_msg = "Type: <b>search</b> + the word you want" if get_lang(uid) == "en" else "اكتب: <b>بحث</b> + الكلمة اللي تريدها"
+            return await m.reply_text(err_msg, quote=True)
+        wait_txt = "🔍 Searching..." if get_lang(uid) == "en" else "🔍 جاري البحث..."
+        wait = await m.reply_text(wait_txt, quote=True)
         results = await ytdlp_extract(arg, search_only=True)
         if not results or "entries" not in results or not results["entries"]:
-            await wait.edit_text("ما لقيت نتائج.")
+            no_res = "No results found." if get_lang(uid) == "en" else "ما لقيت نتائج."
+            await wait.edit_text(no_res)
             return
-        text_res = "🔎 <b>أقرب النتائج:</b>\n\n"
+        
+        text_res = "🔎 <b>Top Results:</b>\n\n" if get_lang(uid) == "en" else "🔎 <b>أقرب النتائج:</b>\n\n"
+        un_name = "Unknown" if get_lang(uid) == "en" else "بدون اسم"
         for i, entry in enumerate(results["entries"][:5], start=1):
-            text_res += f"<b>{i}.</b> {safe_html(entry.get('title', 'بدون اسم'))}\n"
-        text_res += "\n<i>للإختيار انسخ الاسم واكتب شغل قبله.</i>"
+            text_res += f"<b>{i}.</b> {safe_html(entry.get('title', un_name))}\n"
+        
+        tip = "\n<i>To play, copy the name and type play before it.</i>" if get_lang(uid) == "en" else "\n<i>للإختيار انسخ الاسم واكتب شغل قبله.</i>"
+        text_res += tip
         await wait.edit_text(text_res, disable_web_page_preview=True)
         return
 
     if cmd == "down":
         if not arg:
             return await m.reply_text(full_link_text(_t(uid, "need_download_name")), disable_web_page_preview=True, quote=True)
-        status_msg = await m.reply_text("جاري التحميل انتظر لحظة…🎵", quote=True)
+        status_txt = "Downloading, please wait a moment…🎵" if get_lang(uid) == "en" else "جاري التحميل انتظر لحظة…🎵"
+        status_msg = await m.reply_text(status_txt, quote=True)
         path, info, thumb_path = await ytdlp_download(arg, "audio")
         if not path or not os.path.exists(path):
             return await status_msg.edit_text("Failed." if get_lang(uid) == "en" else "فشل التحميل.")
         dl_markup = InlineKeyboardMarkup([[InlineKeyboardButton("Channel" if get_lang(uid) == "en" else "ᴄʜᴀɴɴᴇʟ", url=CHANNEL_LINK)]])
         try:
-            await bot.send_audio(chat_id, audio=path, caption=f"••• تم التحميل من قبل : {name}", title=info.get("title", "Audio"), performer=info.get("uploader", "Unknown"), thumb=thumb_path if thumb_path and os.path.exists(thumb_path) else None, reply_to_message_id=m.id, reply_markup=dl_markup)
+            cap_by = f"••• Downloaded By : {name}" if get_lang(uid) == "en" else f"••• تم التحميل من قبل : {name}"
+            await bot.send_audio(chat_id, audio=path, caption=cap_by, title=info.get("title", "Audio"), performer=info.get("uploader", "Unknown"), thumb=thumb_path if thumb_path and os.path.exists(thumb_path) else None, reply_to_message_id=m.id, reply_markup=dl_markup)
         finally:
             try:
                 os.remove(path)
@@ -2161,7 +2191,8 @@ async def on_text(client: Client, m: Message):
             return await status_msg.edit_text("Failed." if get_lang(uid) == "en" else "فشل التحميل.")
         dl_markup = InlineKeyboardMarkup([[InlineKeyboardButton("Channel" if get_lang(uid) == "en" else "ᴄʜᴀɴɴᴇʟ", url=CHANNEL_LINK)]])
         try:
-            await bot.send_video(chat_id, video=path, caption=f"{_t(uid, 'download_vid_done')} {safe_html(info.get('title', ''))}\n••• تم التحميل من قبل : {name}", thumb=thumb_path if thumb_path and os.path.exists(thumb_path) else None, reply_to_message_id=m.id, reply_markup=dl_markup)
+            cap_by = f"••• Downloaded By : {name}" if get_lang(uid) == "en" else f"••• تم التحميل من قبل : {name}"
+            await bot.send_video(chat_id, video=path, caption=f"{_t(uid, 'download_vid_done')} {safe_html(info.get('title', ''))}\n{cap_by}", thumb=thumb_path if thumb_path and os.path.exists(thumb_path) else None, reply_to_message_id=m.id, reply_markup=dl_markup)
         finally:
             try:
                 os.remove(path)
@@ -2273,7 +2304,8 @@ async def on_text(client: Client, m: Message):
 
     if cmd in {"athan_on", "athan_off", "athan_toggle", "athan_test"}:
         if m.chat.type != ChatType.PRIVATE and not await is_admin(client, chat_id, uid):
-            return await m.reply_text("للمشرفين فقط ❌", quote=True)
+            err_adm = "Admins only ❌" if get_lang(uid) == "en" else "للمشرفين فقط ❌"
+            return await m.reply_text(err_adm, quote=True)
 
         if cmd == "athan_test":
             prayer_key = parse_prayer_key(arg) if arg else ""
@@ -2286,9 +2318,13 @@ async def on_text(client: Client, m: Message):
             sent_id = await send_athan_alert(chat_id, prayer_key, triggered_by=uid, is_test=True)
             if sent_id:
                 prayer_name = ATHAN_PRAYERS.get(prayer_key, {}).get("name_ar", prayer_key)
-                await m.reply_text(f"تم إرسال تيست الأذان لصلاة {prayer_name} ✅", quote=True)
+                if get_lang(uid) == "en":
+                    await m.reply_text(f"Athan test sent for {prayer_key} prayer ✅", quote=True)
+                else:
+                    await m.reply_text(f"تم إرسال تيست الأذان لصلاة {prayer_name} ✅", quote=True)
             else:
-                await m.reply_text("فشل إرسال تيست الأذان. تأكد من صلاحية إرسال الصور والتثبيت. ❌", quote=True)
+                err_test = "Failed to send Athan test. Ensure I have photo and pin rights. ❌" if get_lang(uid) == "en" else "فشل إرسال تيست الأذان. تأكد من صلاحية إرسال الصور والتثبيت. ❌"
+                await m.reply_text(err_test, quote=True)
             return
 
         current = athan_is_enabled(chat_id)
@@ -2300,7 +2336,10 @@ async def on_text(client: Client, m: Message):
             target = not current
         set_athan_enabled(chat_id, target)
         await get_today_prayer_times(force_refresh=True)
-        await m.reply_text("تم تفعيل تنبيهات الأذان في هذه المحادثة ✅" if target else "تم تعطيل تنبيهات الأذان في هذه المحادثة ✅", quote=True)
+        
+        msg_on = "Athan alerts have been ENABLED in this chat ✅" if get_lang(uid) == "en" else "تم تفعيل تنبيهات الأذان في هذه المحادثة ✅"
+        msg_off = "Athan alerts have been DISABLED in this chat ✅" if get_lang(uid) == "en" else "تم تعطيل تنبيهات الأذان في هذه المحادثة ✅"
+        await m.reply_text(msg_on if target else msg_off, quote=True)
         return
 
     if cmd == "loop":
